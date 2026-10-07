@@ -51,7 +51,8 @@ so it runs next to your own Quickshell config (or none) without touching it.
   Fedora install what they package and tell you where to get Quickshell and matugen)
 - downloads the Material Symbols Rounded font into `~/.local/share/fonts` if it's missing
 - links the folder to `~/.config/qs-wallpaperpicker` if you cloned it elsewhere
-- puts the `qs-wallpaperpicker` command in `~/.local/bin`, and makes `~/Pictures/wallpapers`
+- puts the `qs-wallpaperpicker` command on your `PATH`: in `~/.local/bin` if that's on it, otherwise
+  (after asking) in `/usr/local/bin`, so it works in every shell and in keybinds right away, and makes `~/Pictures/wallpapers`
 
 Options: `--no-deps` (skip packages and the font), `--copy` (copy the folder instead of
 linking it), `--yes` (don't ask).

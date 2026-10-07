@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Shared by the package's install.sh (sourced, not run): messages, system
 # packages through the distro's package manager, fonts, and putting the
-# config in ~/.config/<name> and its command in ~/.local/bin.
+# config in ~/.config/<name> and its command on PATH (~/.local/bin, or
+# /usr/local/bin when ~/.local/bin isn't on PATH).
 #
 # install.sh sets, before calling these:
 #   ASSUME_YES     1 to skip the prompts
 #   PACMAN_PKGS    Arch packages     APT_PKGS   Debian/Ubuntu packages
 #   DNF_PKGS       Fedora packages   MANUAL     lines saying what to get by hand
 #                                               where a distro has no package
+# (INSTALL_PM and SYSTEM_BIN override the package manager and /usr/local/bin,
+# for testing.)
 
 info() { printf '\033[1;34m::\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
@@ -167,21 +170,50 @@ install_config() {  # name
     fi
 }
 
-# The package's command (bin/$1) as ~/.local/bin/$1, a link into the
-# config so it stays current. A different file of that name is left alone.
-install_command() {  # name
-    local bin="$HOME/.local/bin"
-    local dest="$bin/$1"
-    local src="${XDG_CONFIG_HOME:-$HOME/.config}/$1/bin/$1"
-    if [[ -e $dest || -L $dest ]] && ! grep -q "Installed by $1's install.sh" "$dest" 2>/dev/null; then
+on_path() { [[ ":$PATH:" == *":$1:"* ]]; }
+
+# Links the command into a folder: as is, or with "sudo" as $3. A different
+# file of that name is left alone (ours say "Installed by <name>'s install.sh").
+link_command() {  # source dest [sudo]
+    local src=$1 dest=$2 name=${1##*/}
+    if [[ -e $dest || -L $dest ]] && ! grep -q "Installed by $name's install.sh" "$dest" 2>/dev/null; then
         warn "$dest exists and isn't this package's; leaving it alone (use $src instead)"
+        return 1
+    fi
+    ${3-} mkdir -p "$(dirname "$dest")" && ${3-} ln -sfn "$src" "$dest" || return 1
+    info "Installed the $name command in $(dirname "$dest")"
+}
+
+# The line that puts ~/.local/bin on PATH for the user's shell.
+path_hint() {
+    case ${SHELL##*/} in
+        fish) echo "fish_add_path ~/.local/bin" ;;
+        zsh)  echo "echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc" ;;
+        *)    echo "echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc" ;;
+    esac
+}
+
+# The package's command (bin/$1), linked into the config so it stays
+# current: in ~/.local/bin when that's on PATH. Otherwise in /usr/local/bin
+# (with sudo, after asking), which every shell and compositor has on PATH,
+# so it works at once, in keybinds too. Declined, it goes in ~/.local/bin
+# with the line that puts that on PATH.
+install_command() {  # name
+    local name=$1
+    local src="${XDG_CONFIG_HOME:-$HOME/.config}/$name/bin/$name"
+    local bin="$HOME/.local/bin"
+    if on_path "$bin"; then
+        link_command "$src" "$bin/$name" || true
         return
     fi
-    mkdir -p "$bin"
-    ln -sfn "$src" "$dest"
-    info "Installed the $1 command in $bin"
-    case ":$PATH:" in
-        *":$bin:"*) ;;
-        *) warn "$bin isn't on your PATH: add it, or run $dest" ;;
-    esac
+    local sys=${SYSTEM_BIN:-/usr/local/bin}
+    if on_path "$sys" \
+        && confirm "$bin isn't on your PATH. Put the $name command in $sys instead (needs sudo)?" \
+        && link_command "$src" "$sys/$name" sudo; then
+        return
+    fi
+    link_command "$src" "$bin/$name" || return 0
+    warn "$bin isn't on your PATH, so '$name' won't be found. Add it with"
+    printf '     %s\n' "$(path_hint)" >&2
+    warn "then open a new terminal (and use $bin/$name in compositor keybinds, or log in again)."
 }
