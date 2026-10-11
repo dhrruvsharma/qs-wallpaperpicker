@@ -608,27 +608,40 @@ Item {
         id: keys
         anchors.fill: parent
         focus: true
+        property string keySequence: ""
+
+        Timer {
+            id: sequenceTimer
+            interval: 1000
+            onTriggered: keySequence = ""
+        }
 
         Keys.onPressed: event => {
-            const k = event.key;
-            if (k === Qt.Key_Escape) {
+            const k = event.key; 
+            if (event.text != "g"){
+                keySequence = ""
+            }
+           if (k === Qt.Key_Escape) {
                 if (window.settingsOpen)
                     window.setSettingsOpen(false);
                 else if (window.peekKept)
                     window.peekKept = false;
                 else
                     window.close();
-            } else if (k === Qt.Key_Left || k === Qt.Key_Up) {
+            } else if (k === Qt.Key_Left || k === Qt.Key_Up || k === Qt.Key_K || k === Qt.Key_H) {
                 window.step(-1);
-            } else if (k === Qt.Key_Right || k === Qt.Key_Down) {
-                window.step(1);
-            } else if (k === Qt.Key_Home) {
+            } else if (k === Qt.Key_Right || k === Qt.Key_Down || k === Qt.Key_J || k === Qt.Key_L) {
+                window.step(1); 
+            } else if (k === Qt.Key_Home || (keySequence === "g" && event.text === "g")) {
                 window.go(0);
-            } else if (k === Qt.Key_End) {
+            }else if (keySequence === "" && event.text === "g") {
+                keySequence = "g"
+                sequenceTimer.restart() ;
+            }else if (k === Qt.Key_End || event.text === "G") {
                 window.go(window.count - 1);
-            } else if (k === Qt.Key_PageUp) {
+            } else if (k === Qt.Key_PageUp || k === Qt.Key_U) {
                 window.step(-window.side);
-            } else if (k === Qt.Key_PageDown) {
+            } else if (k === Qt.Key_PageDown || k === Qt.Key_D) {
                 window.step(window.side);
             } else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
                 window.pickCurrent();
